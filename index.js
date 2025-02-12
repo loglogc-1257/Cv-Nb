@@ -1,52 +1,54 @@
-const express = require('express');
-const bodyParser = require('body-parser');
+require('dotenv').config();
 const fs = require('fs');
-const { handleMessage } = require('./handles/handleMessage');
-const { handlePostback } = require('./handles/handlePostback');
+const path = require('path');
+const { sendMessage } = require('./sendMessage');
+const { analyzeImage } = require('./analyzeImage');
 
-const app = express();
-app.use(bodyParser.json());
+const commands = new Map();
+const prefix = '-';
 
-const VERIFY_TOKEN = 'pagebot';
+// Charger les commandes du dossier 'commands'
+fs.readdirSync(path.join(__dirname, '../commands'))
+  .filter(file => file.endsWith('.js'))
+  .forEach(file => {
+    const command = require(`../commands/${file}`);
+    commands.set(command.name.toLowerCase(), command);
+  });
 
-const PAGE_ACCESS_TOKEN = fs.readFileSync('token.txt', 'utf8').trim();
+async function handleMessage(event, pageAccessToken) {
+  const senderId = event?.sender?.id;
+  if (!senderId) return console.error('❌ Erreur : ID de l\'expéditeur invalide.');
 
-app.get('/webhook', (req, res) => {
-  const mode = req.query['hub.mode'];
-  const token = req.query['hub.verify_token'];
-  const challenge = req.query['hub.challenge'];
+  // Vérifier si un message contient une pièce jointe (image)
+  if (event.message?.attachments) {
+    const attachment = event.message.attachments[0];
 
-  if (mode && token) {
-    if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-      console.log('WEBHOOK_VERIFIED');
-      res.status(200).send(challenge);
+    if (attachment.type === "image") {
+      const imageUrl = attachment.payload.url;
+      return analyzeImage(senderId, imageUrl, pageAccessToken);
     } else {
-      res.sendStatus(403);
+      return sendMessage(senderId, { text: "❌ Je ne peux analyser que des images pour le moment." }, pageAccessToken);
     }
   }
-});
 
-app.post('/webhook', (req, res) => {
-  const body = req.body;
+  // Vérifier si un message texte a été envoyé
+  const messageText = event?.message?.text?.trim();
+  if (!messageText) return console.log('ℹ️ Message reçu sans texte.');
 
-  if (body.object === 'page') {
-    body.entry.forEach(entry => {
-      entry.messaging.forEach(event => {
-        if (event.message) {
-          handleMessage(event, PAGE_ACCESS_TOKEN);
-        } else if (event.postback) {
-          handlePostback(event, PAGE_ACCESS_TOKEN);
-        }
-      });
-    });
+  const [commandName, ...args] = messageText.startsWith(prefix)
+    ? messageText.slice(prefix.length).split(' ')
+    : messageText.split(' ');
 
-    res.status(200).send('EVENT_RECEIVED');
-  } else {
-    res.sendStatus(404);
+  try {
+    if (commands.has(commandName.toLowerCase())) {
+      await commands.get(commandName.toLowerCase()).execute(senderId, args, pageAccessToken, sendMessage);
+    } else {
+      await commands.get('ai').execute(senderId, [messageText], pageAccessToken);
+    }
+  } catch (error) {
+    console.error(`❌ Erreur lors de l'exécution de la commande:`, error);
+    await sendMessage(senderId, { text: error.message || '⚠️ Une erreur est survenue lors de l\'exécution de cette commande.' }, pageAccessToken);
   }
-});
+}
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+module.exports = { handleMessage };
