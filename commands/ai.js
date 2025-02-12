@@ -16,7 +16,7 @@ module.exports = {
     const query = args.join(" ").toLowerCase();
 
     if (!query) {
-      const defaultMessage = "𝗛𝗘𝗟𝗟𝗢 𝗔𝗠 𝗟𝗢𝗩𝗘𝗟𝗬_𝗔𝗜 𝗥𝗘𝗔𝗗𝗬 𝗧𝗢 𝗔𝗡𝗦𝗪𝗘𝗥 𝗬𝗢𝗨𝗥 𝗤𝗨𝗘𝗦𝗧𝗜𝗢𝗡 ⁉️";
+      const defaultMessage = "𝗛𝗘𝗟𝗟𝗢 𝗔𝗠 Stanley bot ";
       const formattedMessage = useFontFormatting ? formatResponse(defaultMessage) : defaultMessage;
       return await sendMessage(senderId, { text: formattedMessage }, pageAccessToken);
     }
@@ -44,7 +44,7 @@ const handleChatResponse = async (senderId, input, pageAccessToken) => {
     const formattedAnsweringMessage = useFontFormatting ? formatResponse(answeringMessage) : answeringMessage;
     await sendMessage(senderId, { text: formattedAnsweringMessage }, pageAccessToken);
 
-    const defaultMessage = `🤖 𝗟𝗢𝗩𝗘𝗟𝗬-𝗔𝗜 👸
+    const defaultMessage = `🤖 Mickey 
 
  ${response}`;
 
